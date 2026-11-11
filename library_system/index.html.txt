@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
+
+    <title>Library Management System</title>
+
+    <link rel="stylesheet" href="style.css">
+
+</head>
+
+<body>
+
+<div class="sidebar">
+
+    <h2>📚 My Library</h2>
+
+    <a href="#dashboard">Dashboard</a>
+
+    <a href="#add">Add Books</a>
+
+    <a href="#books">Manage Books</a>
+
+    <a href="#borrow">Borrow Books</a>
+
+    <a href="#loans">Borrowed Books</a>
+
+</div>
+
+
+<div class="main">
+
+    <header>
+
+        <div>
+            <h1>Library Management System</h1>
+            <p>Manage your library efficiently</p>
+        </div>
+
+        <span>Administrator</span>
+
+    </header>
+
+
+    <?php if ($message): ?>
+
+        <div class="message">
+            <?= safe($message) ?>
+        </div>
+
+    <?php endif; ?>
+
+
+    <!-- DASHBOARD -->
+
+    <section id="dashboard">
+
+        <h2>Dashboard</h2>
+
+        <div class="stats">
+
+            <div class="stat">
+                <h3>Total Books</h3>
+                <p><?= $total ?></p>
+            </div>
+
+            <div class="stat">
+                <h3>Borrowed Books</h3>
+                <p><?= $borrowed ?></p>
+            </div>
+
+            <div class="stat">
+                <h3>Available Books</h3>
+                <p><?= $available ?></p>
+            </div>
+
+        </div>
+
+    </section>
+
+
+    <!-- ADD BOOK -->
+
+    <section id="add" class="panel">
+
+        <h2>Add New Book</h2>
+
+        <form method="POST">
+
+            <input
+                type="text"
+                name="title"
+                placeholder="Book Title"
+                required
+            >
+
+            <input
+                type="text"
+                name="author"
+                placeholder="Author Name"
+                required
+            >
+
+            <input
+                type="text"
+                name="category"
+                placeholder="Book Category"
+            >
+
+            <input
+                type="number"
+                name="quantity"
+                placeholder="Quantity"
+                min="1"
+                required
+            >
+
+            <button type="submit" name="add_book">
+                Add Book
+            </button>
+
+        </form>
+
+    </section>
+
+
+    <!-- MANAGE BOOKS -->
+
+    <section id="books" class="panel">
+
+        <h2>Manage Books</h2>
+
+        <form method="GET" class="search">
+
+            <input
+                type="text"
+                name="search"
+                placeholder="Search books..."
+                value="<?= safe($search) ?>"
+            >
+
+            <button type="submit">Search</button>
+
+        </form>
+
+        <div class="table-wrap">
+
+            <table>
+
+                <thead>
+
+                    <tr>
+                        <th>ID</th>
+                        <th>Title</th>
+                        <th>Author</th>
+                        <th>Category</th>
+                        <th>Quantity</th>
+                        <th>Available</th>
+                        <th>Action</th>
+                    </tr>
+
+                </thead>
+
+                <tbody>
+
+                <?php while ($book = $books->fetch_assoc()): ?>
+
+                    <tr>
+
+                        <td><?= $book['id'] ?></td>
+
+                        <td><?= safe($book['title']) ?></td>
+
+                        <td><?= safe($book['author']) ?></td>
+
+                        <td><?= safe($book['category']) ?></td>
+
+                        <td><?= $book['quantity'] ?></td>
+
+                        <td><?= $book['available'] ?></td>
+
+                        <td>
+
+                            <form method="POST">
+
+                                <input
+                                    type="hidden"
+                                    name="book_id"
+                                    value="<?= $book['id'] ?>"
+                                >
+
+                                <button
+                                    class="delete"
+                                    name="delete_book"
+                                    onclick="return confirm('Delete this book?')"
+                                >
+                                    Delete
+                                </button>
+
+                            </form>
+
+                        </td>
+
+                    </tr>
+
+                <?php endwhile; ?>
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </section>
+
+
+    <!-- BORROW BOOK -->
+
+    <section id="borrow" class="panel">
+
+        <h2>Issue / Borrow Book</h2>
+
+        <form method="POST">
+
+            <select name="book_id" required>
+
+                <option value="">Select a book</option>
+
+                <?php
+
+                $options = $conn->query(
+                    "SELECT b.id, b.title,
+                    b.quantity - (
+                        SELECT COUNT(*) FROM loans l
+                        WHERE l.book_id = b.id
+                        AND l.status = 'Borrowed'
+                    ) AS available
+                    FROM books b"
+                );
+
+                while ($option = $options->fetch_assoc()):
+
+                    if ($option['available'] > 0):
+
+                ?>
+
+                    <option value="<?= $option['id'] ?>">
+
+                        <?= safe($option['title']) ?>
+
+                        (<?= $option['available'] ?> available)
+
+                    </option>
+
+                <?php
+                    endif;
+                endwhile;
+                ?>
+
+            </select>
+
+
+            <input
+                type="text"
+                name="borrower"
+                placeholder="Student Name"
+                required
+            >
+
+            <button name="borrow_book" type="submit">
+                Issue Book
+            </button>
+
+        </form>
+
+    </section>
+
+
+    <!-- RETURN BOOK -->
+
+    <section id="loans" class="panel">
+
+        <h2>Currently Borrowed Books</h2>
+
+        <div class="table-wrap">
+
+            <table>
+
+                <thead>
+
+                    <tr>
+                        <th>Book</th>
+                        <th>Borrower</th>
+                        <th>Borrow Date</th>
+                        <th>Action</th>
+                    </tr>
+
+                </thead>
+
+                <tbody>
+
+                <?php while ($loan = $loans->fetch_assoc()): ?>
+
+                    <tr>
+
+                        <td><?= safe($loan['title']) ?></td>
+
+                        <td><?= safe($loan['borrower']) ?></td>
+
+                        <td><?= safe($loan['borrow_date']) ?></td>
+
+                        <td>
+
+                            <form method="POST">
+
+                                <input
+                                    type="hidden"
+                                    name="loan_id"
+                                    value="<?= $loan['id'] ?>"
+                                >
+
+                                <button name="return_book" type="submit">
+                                    Return Book
+                                </button>
+
+                            </form>
+
+                        </td>
+
+                    </tr>
+
+                <?php endwhile; ?>
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </section>
+
+
+    <footer>
+        Library Management System &copy; <?= date('Y') ?>
+    </footer>
+
+</div>
+
+</body>
+</html>

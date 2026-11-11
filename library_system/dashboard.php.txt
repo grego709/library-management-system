@@ -1,39 +1,203 @@
 <?php
-incl
-include "db.php";
-$books=$conn->query(
-"SELECT COUNT(*)AS total FROM books"
+require 'db.php';
+
+$message = "";
+
+// ADD BOOK
+if (isset($_POST['add_book'])) {
+
+    $title = trim($_POST['title']);
+    $author = trim($_POST['author']);
+    $category = trim($_POST['category']);
+    $quantity = (int)$_POST['quantity'];
+
+    if ($title && $author && $quantity > 0) {
+
+        $stmt = $conn->prepare(
+            "INSERT INTO books (title, author, category, quantity)
+             VALUES (?, ?, ?, ?)"
+        );
+
+        $stmt->bind_param(
+            "sssi",
+            $title,
+            $author,
+            $category,
+            $quantity
+        );
+
+        $stmt->execute();
+        $stmt->close();
+
+        $message = "Book added successfully!";
+    }
+}
+
+// DELETE BOOK
+if (isset($_POST['delete_book'])) {
+
+    $id = (int)$_POST['book_id'];
+
+    $stmt = $conn->prepare(
+        "DELETE FROM books
+         WHERE id = ?
+         AND NOT EXISTS (
+            SELECT 1 FROM loans WHERE book_id = books.id
+         )"
+    );
+
+    $stmt->bind_param("i", $id);
+    $stmt->execute();
+
+    $message = $stmt->affected_rows
+        ? "Book deleted successfully!"
+        : "Book cannot be deleted because it has loan records.";
+
+    $stmt->close();
+}
+
+// BORROW BOOK
+if (isset($_POST['borrow_book'])) {
+
+    $book_id = (int)$_POST['book_id'];
+    $borrower = trim($_POST['borrower']);
+
+    if ($book_id > 0 && $borrower !== '') {
+
+        $conn->begin_transaction();
+
+        try {
+
+            $stmt = $conn->prepare(
+                "SELECT quantity FROM books
+                 WHERE id = ? FOR UPDATE"
+            );
+
+            $stmt->bind_param("i", $book_id);
+            $stmt->execute();
+
+            $book = $stmt->get_result()->fetch_assoc();
+            $stmt->close();
+
+            if (!$book) {
+                throw new Exception("Book not found.");
+            }
+
+            $stmt = $conn->prepare(
+                "SELECT COUNT(*) AS total
+                 FROM loans
+                 WHERE book_id = ?
+                 AND status = 'Borrowed'"
+            );
+
+            $stmt->bind_param("i", $book_id);
+            $stmt->execute();
+
+            $borrowed = $stmt->get_result()
+                ->fetch_assoc()['total'];
+
+            $stmt->close();
+
+            if ($borrowed >= $book['quantity']) {
+                throw new Exception("No available copies.");
+            }
+
+            $stmt = $conn->prepare(
+                "INSERT INTO loans
+                 (book_id, borrower, borrow_date)
+                 VALUES (?, ?, CURDATE())"
+            );
+
+            $stmt->bind_param("is", $book_id, $borrower);
+            $stmt->execute();
+            $stmt->close();
+
+            $conn->commit();
+
+            $message = "Book borrowed successfully!";
+
+        } catch (Throwable $e) {
+
+            $conn->rollback();
+            $message = $e->getMessage();
+        }
+    }
+}
+
+// RETURN BOOK
+if (isset($_POST['return_book'])) {
+
+    $loan_id = (int)$_POST['loan_id'];
+
+    $stmt = $conn->prepare(
+        "UPDATE loans
+         SET status = 'Returned',
+         return_date = CURDATE()
+         WHERE id = ?
+         AND status = 'Borrowed'"
+    );
+
+    $stmt->bind_param("i", $loan_id);
+    $stmt->execute();
+
+    $message = $stmt->affected_rows
+        ? "Book returned successfully!"
+        : "Loan not found or already returned.";
+
+    $stmt->close();
+}
+
+// DASHBOARD STATISTICS
+$total = $conn->query(
+    "SELECT COALESCE(SUM(quantity),0) AS total
+     FROM books"
 )->fetch_assoc()['total'];
-$members=$conn->query(
-"SELECT COUNT(*)AS total FROM members"
+
+$borrowed = $conn->query(
+    "SELECT COUNT(*) AS total
+     FROM loans WHERE status='Borrowed'"
 )->fetch_assoc()['total'];
-$borrowed=$conn->query(
-"SELECT COUNT(*)AS total
-FROM borrow_records
-Where status='Borrowed'"
-)->fetch_assoc()['total'];
-$available=$conn->query(
-"SELECT COALESCE(SUM(available),0)AS total FROM books"
-)->fetch_assoc()['total'];
+
+$available = $total - $borrowed;
+
+// SEARCH BOOKS
+$search = trim($_GET['search'] ?? '');
+
+$stmt = $conn->prepare(
+    "SELECT b.*,
+     b.quantity - (
+        SELECT COUNT(*) FROM loans l
+        WHERE l.book_id = b.id
+        AND l.status = 'Borrowed'
+     ) AS available
+     FROM books b
+     WHERE b.title LIKE ?
+     OR b.author LIKE ?
+     OR b.category LIKE ?
+     ORDER BY b.id DESC"
+);
+
+$term = "%$search%";
+
+$stmt->bind_param("sss", $term, $term, $term);
+$stmt->execute();
+
+$books = $stmt->get_result();
+
+// BORROWED BOOKS
+$loans = $conn->query(
+    "SELECT l.*, b.title
+     FROM loans l
+     JOIN books b ON l.book_id = b.id
+     WHERE l.status = 'Borrowed'
+     ORDER BY l.id DESC"
+);
+
+function safe($value) {
+    return htmlspecialchars(
+        (string)($value ?? ''),
+        ENT_QUOTES,
+        'UTF-8'
+    );
+}
 ?>
-<!DOCTYPE html>
-<html>
-<head>
-<title>Library Dashboard</title>
-<link rel="stylesheet"href="css/style.css">
-</head>
-<body>
-<header>
-<h1>LIBRARY DASHBOARD</h1>
-</header>
-<nav>
-<a href="index.php">Home</a>
-<a href="add_book.php">Add Books</a>
-<a href="view_books.php">View Books</a>
-<a href="members.php">Members</a>
-<a href="borrow.php">Borrow Books</a>
-</nav>
-<div class="welcome">
-<h2>Library Statistics</h2>
-<h3>Total Book Titles:<?php echo $books;?></h3>
-<h3>T
