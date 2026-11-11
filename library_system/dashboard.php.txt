@@ -1,0 +1,39 @@
+<?php
+incl
+include "db.php";
+$books=$conn->query(
+"SELECT COUNT(*)AS total FROM books"
+)->fetch_assoc()['total'];
+$members=$conn->query(
+"SELECT COUNT(*)AS total FROM members"
+)->fetch_assoc()['total'];
+$borrowed=$conn->query(
+"SELECT COUNT(*)AS total
+FROM borrow_records
+Where status='Borrowed'"
+)->fetch_assoc()['total'];
+$available=$conn->query(
+"SELECT COALESCE(SUM(available),0)AS total FROM books"
+)->fetch_assoc()['total'];
+?>
+<!DOCTYPE html>
+<html>
+<head>
+<title>Library Dashboard</title>
+<link rel="stylesheet"href="css/style.css">
+</head>
+<body>
+<header>
+<h1>LIBRARY DASHBOARD</h1>
+</header>
+<nav>
+<a href="index.php">Home</a>
+<a href="add_book.php">Add Books</a>
+<a href="view_books.php">View Books</a>
+<a href="members.php">Members</a>
+<a href="borrow.php">Borrow Books</a>
+</nav>
+<div class="welcome">
+<h2>Library Statistics</h2>
+<h3>Total Book Titles:<?php echo $books;?></h3>
+<h3>T

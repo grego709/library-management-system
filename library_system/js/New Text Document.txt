@@ -1,0 +1,80 @@
+
+// LIBRARY MANAGEMENT SYSTEM JAVASCRIPT
+
+document.addEventListener("DOMContentLoaded", function () {
+
+    console.log("Library Management System is running!");
+
+    // Confirm book deletion
+    document.querySelectorAll("button[name='delete_book']")
+        .forEach(function (button) {
+
+            button.addEventListener("click", function (event) {
+
+                if (!confirm("Are you sure you want to delete this book?")) {
+                    event.preventDefault();
+                }
+
+            });
+
+        });
+
+
+    // Confirm book return
+    document.querySelectorAll("button[name='return_book']")
+        .forEach(function (button) {
+
+            button.addEventListener("click", function (event) {
+
+                if (!confirm("Confirm that this book has been returned?")) {
+                    event.preventDefault();
+                }
+
+            });
+
+        });
+
+
+    // Validate book quantity
+    const quantity = document.querySelector("input[name='quantity']");
+
+    if (quantity) {
+
+        quantity.addEventListener("input", function () {
+
+            if (this.value < 1 && this.value !== "") {
+                this.setCustomValidity("Quantity must be at least 1");
+            } else {
+                this.setCustomValidity("");
+            }
+
+        });
+
+    }
+
+
+    // Validate due date
+    const dueDate = document.querySelector("input[name='due_date']");
+
+    if (dueDate) {
+
+        dueDate.addEventListener("change", function () {
+
+            const today = new Date();
+            const year = today.getFullYear();
+            const month = String(today.getMonth() + 1).padStart(2, "0");
+            const day = String(today.getDate()).padStart(2, "0");
+
+            const currentDate = `${year}-${month}-${day}`;
+
+            if (this.value < currentDate) {
+                this.setCustomValidity("Due date cannot be in the past.");
+            } else {
+                this.setCustomValidity("");
+            }
+
+        });
+
+    }
+
+});
